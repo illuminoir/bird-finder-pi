@@ -1,0 +1,6 @@
+venv/
+wav_audios/
+.idea/
+.env
+__pycache__/
+old_versions/
