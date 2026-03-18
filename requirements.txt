@@ -6,3 +6,5 @@ sounddevice
 numpy
 python-telegram-bot[job-queue]==22.5
 python-dotenv
+flask
+requests

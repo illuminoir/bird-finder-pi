@@ -32,7 +32,6 @@ init_db()
 
 analyzer = Analyzer()
 
-# Track last detection time per species
 last_species_seen = {}
 
 print("Listening...\n")
@@ -52,12 +51,10 @@ while True:
         )
         sd.wait()
 
-        # Save temporary WAV
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
             sf.write(tmp.name, audio, SAMPLE_RATE)
             temp_path = tmp.name
 
-        # Analyze with BirdNET
         recording = Recording(
             analyzer,
             temp_path,
@@ -76,22 +73,14 @@ while True:
                 species = detection["common_name"]
                 confidence = detection["confidence"]
 
-                # Check species cooldown
                 last_seen = last_species_seen.get(species, 0)
 
                 if now - last_seen > SPECIES_COOLDOWN:
                     insert_detection(species, confidence)
                     last_species_seen[species] = now
-
-                    print(
-                        f"🐦 Stored: {species} "
-                        f"({round(confidence * 100, 1)}%)"
-                    )
+                    print(f"🐦 Stored: {species} ({round(confidence * 100, 1)}%)")
                 else:
-                    print(
-                        f"Skipped {species} (cooldown active)"
-                    )
-
+                    print(f"Skipped {species} (cooldown active)")
         else:
             print("No birds detected.")
 

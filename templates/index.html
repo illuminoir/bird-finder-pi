@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Bird Finder</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+    <style>
+        :root {
+            --bg:        #0b0f0c;
+            --surface:   #111710;
+            --border:    #1e2b1f;
+            --green:     #4ade80;
+            --green-dim: #1a3d22;
+            --amber:     #fbbf24;
+            --muted:     #4a5e4c;
+            --text:      #d4e8d5;
+            --text-dim:  #6b8a6d;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'DM Mono', monospace;
+            font-size: 13px;
+            min-height: 100vh;
+            padding: 2rem;
+            background-image:
+                    radial-gradient(ellipse 80% 50% at 50% -10%, #0d2e1230 0%, transparent 70%),
+                    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='1' height='1' fill='%231a2e1b' opacity='0.4'/%3E%3C/svg%3E");
+        }
+
+        .wrapper { max-width: 1100px; margin: 0 auto; }
+
+        /* ── Header ── */
+        header {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 1.5rem;
+            margin-bottom: 2.5rem;
+            animation: fadeDown 0.6s ease both;
+        }
+
+        .logo {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.4rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: var(--text);
+            line-height: 1;
+        }
+
+        .logo span { color: var(--green); }
+
+        .live-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--green);
+            font-size: 11px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .live-dot {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 8px var(--green);
+            animation: pulse 2s infinite;
+        }
+
+        /* ── Detection Hero ── */
+        .latest-pair {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            animation: fadeUp 0.6s 0.1s ease both;
+        }
+
+        .latest {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+            min-height: 160px;
+        }
+
+        .latest.first  { animation: none; }
+        .latest.second { animation: none; }
+
+        @media (max-width: 700px) { .latest { grid-template-columns: 1fr; } }
+
+        .latest-image {
+            position: relative;
+            overflow: hidden;
+            background: var(--green-dim);
+            min-height: 200px;
+        }
+
+        .latest-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            filter: brightness(0.85) saturate(0.9);
+            transition: transform 0.6s ease;
+        }
+
+        .latest-image:hover img { transform: scale(1.03); }
+
+        .latest-image-placeholder {
+            width: 100%;
+            height: 100%;
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 5rem;
+            background: var(--green-dim);
+        }
+
+        .latest-info {
+            background: var(--surface);
+            padding: 2rem 2.2rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            border-left: 1px solid var(--border);
+        }
+
+        .latest-label {
+            font-size: 10px;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--green);
+            margin-bottom: 0.8rem;
+        }
+
+        /* dim label for the second box */
+        .latest.second .latest-label { color: var(--text-dim); }
+
+        .latest-name {
+            font-family: 'Playfair Display', serif;
+            font-size: 2.4rem;
+            font-style: italic;
+            color: #fff;
+            line-height: 1.1;
+            margin-bottom: 1rem;
+        }
+
+        .latest.second .latest-name { font-size: 1.8rem; color: var(--text); }
+
+        .latest-meta { display: flex; flex-direction: column; gap: 0.5rem; }
+
+        .latest-meta-row {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            color: var(--text-dim);
+            font-size: 12px;
+        }
+
+        .latest-meta-row .dot {
+            width: 4px; height: 4px;
+            border-radius: 50%;
+            background: var(--muted);
+            flex-shrink: 0;
+        }
+
+        .latest-conf { color: var(--amber); }
+
+        .latest-empty {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 0.8rem;
+            padding: 3rem;
+            color: var(--text-dim);
+            background: var(--surface);
+        }
+
+        .latest-empty .icon { font-size: 2.5rem; opacity: 0.4; }
+
+        /* ── Stats row ── */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+            animation: fadeUp 0.6s 0.2s ease both;
+        }
+
+        .stat-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 1.2rem 1.4rem;
+        }
+
+        .stat-label {
+            color: var(--text-dim);
+            font-size: 10px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-family: 'Playfair Display', serif;
+            font-size: 2rem;
+            color: var(--green);
+            line-height: 1;
+        }
+
+        /* ── Bird of the Day ── */
+        .botd {
+            background: var(--green-dim);
+            border: 1px solid #2a5c32;
+            border-radius: 4px;
+            padding: 1.4rem 2rem;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+            animation: fadeUp 0.6s 0.25s ease both;
+        }
+
+        .botd-icon { font-size: 2.2rem; line-height: 1; filter: drop-shadow(0 0 12px #4ade8055); }
+
+        .botd-label {
+            font-size: 10px;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--green);
+            margin-bottom: 0.3rem;
+        }
+
+        .botd-name {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.5rem;
+            font-style: italic;
+            color: #fff;
+        }
+
+        .botd-count { color: var(--text-dim); margin-top: 0.2rem; font-size: 11px; }
+
+        /* ── Two-column grid ── */
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1.3fr;
+            gap: 1.5rem;
+            animation: fadeUp 0.6s 0.3s ease both;
+        }
+
+        @media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+
+        /* ── Panels ── */
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 0.9rem 1.4rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 10px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* ── Live Feed ── */
+        .feed { list-style: none; }
+
+        .feed-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1.4rem;
+            border-bottom: 1px solid var(--border);
+            transition: background 0.15s;
+        }
+
+        .feed-item:last-child { border-bottom: none; }
+        .feed-item:hover { background: #151d15; }
+        .feed-species { color: var(--text); font-weight: 500; }
+
+        .feed-meta {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            color: var(--text-dim);
+            font-size: 11px;
+        }
+
+        .conf { color: var(--amber); font-size: 11px; }
+
+        /* ── Species Stats Table ── */
+        .species-table { width: 100%; border-collapse: collapse; }
+
+        .species-table th {
+            padding: 0.6rem 1.4rem;
+            text-align: left;
+            font-size: 10px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            border-bottom: 1px solid var(--border);
+            font-weight: 400;
+        }
+
+        .species-table td {
+            padding: 0.7rem 1.4rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 12px;
+        }
+
+        .species-table tr:last-child td { border-bottom: none; }
+        .species-table tr:hover td { background: #151d15; }
+        .species-name { color: var(--text); font-weight: 500; }
+
+        .count-bar-wrap { display: flex; align-items: center; gap: 0.6rem; }
+
+        .count-bar-bg {
+            flex: 1;
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .count-bar-fill {
+            height: 100%;
+            background: var(--green);
+            border-radius: 2px;
+        }
+
+        .count-num { color: var(--green); min-width: 2rem; text-align: right; }
+        .last-seen { color: var(--text-dim); font-size: 11px; }
+
+        /* ── Footer ── */
+        footer {
+            margin-top: 2.5rem;
+            padding-top: 1.2rem;
+            border-top: 1px solid var(--border);
+            color: var(--muted);
+            font-size: 11px;
+            display: flex;
+            justify-content: space-between;
+            animation: fadeUp 0.6s 0.4s ease both;
+        }
+
+        .empty { padding: 2rem 1.4rem; color: var(--text-dim); text-align: center; }
+
+        @keyframes fadeDown {
+            from { opacity: 0; transform: translateY(-12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50%       { opacity: 0.3; }
+        }
+    </style>
+</head>
+<body>
+<div class="wrapper">
+
+    <!-- Header -->
+    <header>
+        <div class="logo">Bird<span>.</span>Finder</div>
+        <div class="live-badge"><div class="live-dot"></div> Live</div>
+    </header>
+
+    <!-- Box 1: Latest non-excluded detection -->
+    <div class="latest-pair">
+        <div class="latest first">
+            {% if latest %}
+            <div class="latest-image">
+                {% if latest.image_url %}
+                <img src="{{ latest.image_url }}" alt="{{ latest.species }}"/>
+                {% else %}
+                <div class="latest-image-placeholder">🐦</div>
+                {% endif %}
+            </div>
+            <div class="latest-info">
+                <div class="latest-label">Latest Detection</div>
+                <div class="latest-name">{{ latest.species }}</div>
+                <div class="latest-meta">
+                    <div class="latest-meta-row">
+                        <div class="dot"></div>
+                        <span class="latest-conf">{{ latest.confidence }}% confidence</span>
+                    </div>
+                    <div class="latest-meta-row">
+                        <div class="dot"></div>
+                        <span>{{ latest.time_ago }}</span>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="latest-empty">
+                <div class="icon">🌿</div>
+                <span>No detections recorded yet.</span>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Box 2: Latest overall (all species, including excluded) -->
+        <div class="latest second">
+            {% if last %}
+            <div class="latest-image">
+                {% if last.image_url %}
+                <img src="{{ last.image_url }}" alt="{{ last.species }}"/>
+                {% else %}
+                <div class="latest-image-placeholder">🐦</div>
+                {% endif %}
+            </div>
+            <div class="latest-info">
+                <div class="latest-label">Last Detected (all species)</div>
+                <div class="latest-name">{{ last.species }}</div>
+                <div class="latest-meta">
+                    <div class="latest-meta-row">
+                        <div class="dot"></div>
+                        <span class="latest-conf">{{ last.confidence }}% confidence</span>
+                    </div>
+                    <div class="latest-meta-row">
+                        <div class="dot"></div>
+                        <span>{{ last.time_ago }}</span>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="latest-empty">
+                <div class="icon">🌿</div>
+                <span>No detections recorded yet.</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Headline stats -->
+    <div class="stats-row">
+        <div class="stat-card">
+            <div class="stat-label">Total Detections</div>
+            <div class="stat-value">{{ total_detections }}</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Unique Species</div>
+            <div class="stat-value">{{ total_species }}</div>
+        </div>
+    </div>
+
+    <!-- Bird of the Day -->
+    {% if bird_of_day %}
+    <div class="botd">
+        <div class="botd-icon">🌟</div>
+        <div>
+            <div class="botd-label">Bird of the Day</div>
+            <div class="botd-name">{{ bird_of_day[0] }}</div>
+            <div class="botd-count">Detected {{ bird_of_day[1] }} time{{ 's' if bird_of_day[1] != 1 else '' }} today</div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Main grid -->
+    <div class="grid">
+
+        <!-- Live Feed -->
+        <div class="panel">
+            <div class="panel-header">
+                <span>Recent Detections</span>
+                <span>last 20</span>
+            </div>
+            {% if recent %}
+            <ul class="feed">
+                {% for bird in recent %}
+                <li class="feed-item">
+                    <span class="feed-species">{{ bird.species }}</span>
+                    <span class="feed-meta">
+            <span class="conf">{{ bird.confidence }}%</span>
+            <span>{{ bird.time_ago }}</span>
+          </span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="empty">No detections recorded yet.</div>
+            {% endif %}
+        </div>
+
+        <!-- Species Stats -->
+        <div class="panel">
+            <div class="panel-header">
+                <span>Species Overview</span>
+                <span>all time</span>
+            </div>
+            {% if stats %}
+            {% set max_count = stats[0].count %}
+            <table class="species-table">
+                <thead>
+                <tr>
+                    <th>Species</th>
+                    <th>Detections</th>
+                    <th>Last Seen</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for s in stats %}
+                <tr>
+                    <td class="species-name">{{ s.species }}</td>
+                    <td>
+                        <div class="count-bar-wrap">
+                            <div class="count-bar-bg">
+                                <div class="count-bar-fill" style="width: {{ (s.count / max_count * 100)|int }}%"></div>
+                            </div>
+                            <span class="count-num">{{ s.count }}</span>
+                        </div>
+                    </td>
+                    <td class="last-seen">{{ s.last_seen }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="empty">No species data yet.</div>
+            {% endif %}
+        </div>
+
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <span>Bird Finder — Raspberry Pi</span>
+        <span id="last-refresh">Refreshes every 30s</span>
+    </footer>
+
+</div>
+
+<script>
+    setTimeout(() => { window.location.reload(); }, 30000);
+    let countdown = 30;
+    const label = document.getElementById("last-refresh");
+    setInterval(() => {
+        countdown--;
+        label.textContent = `Refreshing in ${countdown}s`;
+    }, 1000);
+</script>
+</body>
+</html>
