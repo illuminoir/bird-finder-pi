@@ -4,3 +4,4 @@ wav_audios/
 .env
 __pycache__/
 old_versions/
+birds.db
