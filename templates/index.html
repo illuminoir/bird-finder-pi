@@ -56,24 +56,6 @@
 
         .logo span { color: var(--green); }
 
-        .live-badge {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            color: var(--green);
-            font-size: 11px;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-        }
-
-        .live-dot {
-            width: 7px; height: 7px;
-            border-radius: 50%;
-            background: var(--green);
-            box-shadow: 0 0 8px var(--green);
-            animation: pulse 2s infinite;
-        }
-
         /* ── Detection Hero ── */
         .latest-pair {
             display: grid;
@@ -353,6 +335,37 @@
         .count-num { color: var(--green); min-width: 2rem; text-align: right; }
         .last-seen { color: var(--text-dim); font-size: 11px; }
 
+        .filter-buttons {
+            display: flex;
+            gap: 0.4rem;
+        }
+
+        .filter-btn,
+        .species-filter-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+            padding: 0.25rem 0.55rem;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .filter-btn:hover,
+        .species-filter-btn:hover {
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        .filter-btn.active,
+        .species-filter-btn.active {
+            background: var(--green-dim);
+            border-color: var(--green);
+            color: var(--green);
+        }
+
         /* ── Footer ── */
         footer {
             margin-top: 2.5rem;
@@ -376,11 +389,6 @@
             from { opacity: 0; transform: translateY(10px); }
             to   { opacity: 1; transform: translateY(0); }
         }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50%       { opacity: 0.3; }
-        }
     </style>
 </head>
 <body>
@@ -389,7 +397,6 @@
     <!-- Header -->
     <header>
         <div class="logo">Bird<span>.</span>Finder</div>
-        <div class="live-badge"><div class="live-dot"></div> Live</div>
     </header>
 
     <!-- Box 1: Latest non-excluded detection -->
@@ -489,61 +496,36 @@
         <div class="panel">
             <div class="panel-header">
                 <span>Recent Detections</span>
-                <span>last 20</span>
+
+                <div class="filter-buttons">
+                    <button class="filter-btn active" data-range="today">Today</button>
+                    <button class="filter-btn" data-range="week">Week</button>
+                    <button class="filter-btn" data-range="month">Month</button>
+                    <button class="filter-btn" data-range="all">All</button>
+                </div>
             </div>
-            {% if recent %}
-            <ul class="feed">
-                {% for bird in recent %}
-                <li class="feed-item">
-                    <span class="feed-species">{{ bird.species }}</span>
-                    <span class="feed-meta">
-            <span class="conf">{{ bird.confidence }}%</span>
-            <span>{{ bird.time_ago }}</span>
-          </span>
-                </li>
-                {% endfor %}
-            </ul>
-            {% else %}
-            <div class="empty">No detections recorded yet.</div>
-            {% endif %}
+
+            <div id="recent-container">
+                {% include 'partials/recent_table.html' %}
+            </div>
         </div>
 
         <!-- Species Stats -->
         <div class="panel">
             <div class="panel-header">
                 <span>Species Overview</span>
-                <span>all time</span>
+
+                <div class="filter-buttons">
+                    <button class="species-filter-btn active" data-range="today">Today</button>
+                    <button class="species-filter-btn" data-range="week">Week</button>
+                    <button class="species-filter-btn" data-range="month">Month</button>
+                    <button class="species-filter-btn" data-range="all">All</button>
+                </div>
             </div>
-            {% if stats %}
-            {% set max_count = stats[0].count %}
-            <table class="species-table">
-                <thead>
-                <tr>
-                    <th>Species</th>
-                    <th>Detections</th>
-                    <th>Last Seen</th>
-                </tr>
-                </thead>
-                <tbody>
-                {% for s in stats %}
-                <tr>
-                    <td class="species-name">{{ s.species }}</td>
-                    <td>
-                        <div class="count-bar-wrap">
-                            <div class="count-bar-bg">
-                                <div class="count-bar-fill" style="width: {{ (s.count / max_count * 100)|int }}%"></div>
-                            </div>
-                            <span class="count-num">{{ s.count }}</span>
-                        </div>
-                    </td>
-                    <td class="last-seen">{{ s.last_seen }}</td>
-                </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            <div class="empty">No species data yet.</div>
-            {% endif %}
+
+            <div id="species-container">
+                {% include 'partials/species_table.html' %}
+            </div>
         </div>
 
     </div>
@@ -564,6 +546,49 @@
         countdown--;
         label.textContent = `Refreshing in ${countdown}s`;
     }, 1000);
+
+    document.querySelectorAll('.filter-btn').forEach(button => {
+
+        button.addEventListener('click', async () => {
+
+            const range = button.dataset.range;
+
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            button.classList.add('active');
+
+            const response = await fetch(`/recent-data?range=${range}`);
+
+            const html = await response.text();
+
+            document.getElementById('recent-container').innerHTML = html;
+        });
+    });
+
+
+    // SPECIES OVERVIEW
+
+    document.querySelectorAll('.species-filter-btn').forEach(button => {
+
+        button.addEventListener('click', async () => {
+
+            const range = button.dataset.range;
+
+            document.querySelectorAll('.species-filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            button.classList.add('active');
+
+            const response = await fetch(`/species-data?range=${range}`);
+
+            const html = await response.text();
+
+            document.getElementById('species-container').innerHTML = html;
+        });
+    });
 </script>
 </body>
 </html>

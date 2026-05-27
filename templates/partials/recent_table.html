@@ -1,0 +1,16 @@
+{% if recent %}
+<ul class="feed">
+    {% for bird in recent %}
+    <li class="feed-item">
+        <span class="feed-species">{{ bird.species }}</span>
+
+        <span class="feed-meta">
+            <span class="conf">{{ bird.confidence }}%</span>
+            <span>{{ bird.time_ago }}</span>
+        </span>
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<div class="empty">No detections recorded yet.</div>
+{% endif %}

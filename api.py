@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, render_template
+from flask import Flask, render_template, request, jsonify
 from db import (
     init_db,
     get_recent_detections,
@@ -9,7 +9,7 @@ from db import (
     get_latest_detection_excluding,
     get_last_detection
 )
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import requests
 
 app = Flask(__name__)
@@ -63,6 +63,19 @@ def get_wikipedia_image(bird_name):
         print(f"Wikipedia image error: {e}")
         return None
 
+def get_cutoff(range_name):
+    now = datetime.now()
+
+    if range_name == "today":
+        return now - timedelta(days=1)
+
+    elif range_name == "week":
+        return now - timedelta(days=7)
+
+    elif range_name == "month":
+        return now - timedelta(days=30)
+
+    return None
 
 # ----------------------------
 # ROUTES
@@ -100,18 +113,18 @@ def index():
 
     recent_formatted = [
         {
-            "species": r[0],
-            "confidence": round(r[1] * 100, 1),
-            "time_ago": time_ago(r[2])
+            "species": r["species"],
+            "confidence": round(float(r["confidence"]) * 100, 1),
+            "time_ago": time_ago(r["timestamp_utc"])
         }
         for r in recent
     ]
 
     stats_formatted = [
         {
-            "species": s[0],
-            "count": s[1],
-            "last_seen": time_ago(s[2])
+            "species": s["species"],
+            "count": s["count"],
+            "last_seen": time_ago(s["last_seen"])
         }
         for s in stats
     ]
@@ -127,6 +140,48 @@ def index():
         total_species=total_species
     )
 
+@app.route('/recent-data')
+def recent_data():
+    range_name = request.args.get('range', 'today')
+
+    cutoff = get_cutoff(range_name)
+    recent = get_recent_detections(cutoff)
+
+    recent_formatted = [
+        {
+            "species": r["species"],
+            "confidence": round(float(r["confidence"]) * 100, 1),
+            "time_ago": time_ago(r["timestamp_utc"])
+        }
+        for r in recent
+    ]
+
+    return render_template(
+        'partials/recent_table.html',
+        recent=recent_formatted
+    )
+
+@app.route('/species-data')
+def species_data():
+    range_name = request.args.get('range', 'today')
+
+    cutoff = get_cutoff(range_name)
+
+    stats = get_species_stats(cutoff)
+
+    stats_formatted = [
+        {
+            "species": s["species"],
+             "count": s["count"],
+             "last_seen": time_ago(s["last_seen"])
+        }
+        for s in stats
+    ]
+
+    return render_template(
+        'partials/species_table.html',
+        stats=stats_formatted
+    )
 
 @app.route("/api/data")
 def api_data():
@@ -153,17 +208,18 @@ def api_data():
         } if bird_of_day else None,
         "recent": [
             {
-                "species": r[0],
-                "confidence": round(r[1] * 100, 1),
-                "time_ago": time_ago(r[2])
+                "id": r["id"],
+                "species": r["species"],
+                "confidence": round(float(r["confidence"]) * 100, 1),
+                "time_ago": time_ago(r["timestamp_utc"])
             }
             for r in recent
         ],
         "stats": [
             {
-                "species": s[0],
-                "count": s[1],
-                "last_seen": time_ago(s[2])
+                "species": s["species"],
+                "count": s["count"],
+                "last_seen": time_ago(s["last_seen"])
             }
             for s in stats
         ],

@@ -41,33 +41,70 @@ def get_last_detection():
     conn.close()
     return row
 
-def get_recent_detections(limit=20):
-    """Latest N detections for the live feed."""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT species, confidence, timestamp_utc
-        FROM detections
-        ORDER BY id DESC
-        LIMIT ?
-    """, (limit,))
-    rows = cursor.fetchall()
-    conn.close()
-    return rows
+def get_recent_detections(cutoff=None):
+    conn = sqlite3.connect("birds.db")
+    conn.row_factory = sqlite3.Row
 
-def get_species_stats():
-    """Per-species: total count and last seen timestamp."""
-    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT species, COUNT(*) as count, MAX(timestamp_utc) as last_seen
-        FROM detections
-        GROUP BY species
-        ORDER BY last_seen DESC
-    """)
+
+    if cutoff:
+        cursor.execute(
+            """
+            SELECT *
+            FROM detections
+            WHERE timestamp_utc >= ?
+            ORDER BY timestamp_utc DESC
+            LIMIT 20
+            """,
+            (cutoff,)
+        )
+    else:
+        cursor.execute(
+            """
+            SELECT *
+            FROM detections
+            ORDER BY timestamp_utc DESC
+            LIMIT 20
+            """
+        )
     rows = cursor.fetchall()
-    conn.close()
-    return rows
+    return [dict(row) for row in rows]
+
+def get_species_stats(cutoff=None):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+
+    cursor = conn.cursor()
+
+    if cutoff:
+        cursor.execute(
+            """
+            SELECT
+                species,
+                COUNT(*) as count,
+                MAX(timestamp_utc) as last_seen
+            FROM detections
+            WHERE timestamp_utc >= ?
+            GROUP BY species
+            ORDER BY count DESC
+            """,
+            (cutoff.isoformat(),)
+        )
+    else:
+        cursor.execute(
+            """
+            SELECT
+                species,
+                COUNT(*) as count,
+                MAX(timestamp_utc) as last_seen
+            FROM detections
+            GROUP BY species
+            ORDER BY count DESC
+            """
+        )
+
+    rows = cursor.fetchall()
+    return [dict(row) for row in rows]
 
 def get_bird_of_the_day():
     """Most detected species today."""
