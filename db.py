@@ -165,3 +165,32 @@ def get_latest_detection_excluding(excluded_species):
     row = cursor.fetchone()
     conn.close()
     return row
+
+def get_activity_heatmap(cutoff=None):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    if cutoff:
+        cursor.execute("""
+            SELECT species, timestamp_utc
+            FROM detections
+            WHERE timestamp_utc >= ?
+            ORDER BY timestamp_utc
+        """, (cutoff.isoformat(),))
+    else:
+        cursor.execute("""
+            SELECT species, timestamp_utc
+            FROM detections
+            ORDER BY timestamp_utc
+        """)
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    return [
+        {
+            "species": r[0],
+            "timestamp_utc": r[1]
+        }
+        for r in rows
+    ]

@@ -1,0 +1,158 @@
+<style>
+    .heatmap-body {
+        padding: 1.2rem 1.4rem 1.4rem;
+        overflow-x: auto;
+    }
+
+    .heatmap-grid {
+        display: grid;
+        grid-template-columns: 130px repeat({{ hours|length }}, 1fr);
+        gap: 3px;
+        align-items: center;
+        min-width: 520px;
+    }
+
+    .hm-hour-label {
+        font-size: 9px;
+        letter-spacing: 0.06em;
+        color: var(--text-dim);
+        text-align: center;
+        padding-bottom: 4px;
+        text-transform: uppercase;
+    }
+
+    .hm-species-label {
+        font-size: 11px;
+        color: var(--text);
+        padding-right: 10px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-style: italic;
+    }
+
+    .hm-cell {
+        height: 24px;
+        border-radius: 2px;
+        cursor: default;
+        transition: transform 0.1s, outline 0.1s;
+        position: relative;
+    }
+
+    .hm-cell:hover {
+        transform: scale(1.15);
+        z-index: 10;
+        outline: 1px solid var(--green);
+    }
+
+    .hm-legend {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        margin-top: 1rem;
+        font-size: 10px;
+        color: var(--text-dim);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    .hm-legend-swatch {
+        width: 14px;
+        height: 14px;
+        border-radius: 2px;
+        flex-shrink: 0;
+    }
+
+    .hm-legend-spacer { margin-right: 4px; }
+
+    .hm-tooltip {
+        position: fixed;
+        background: #0d1a0e;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 6px 10px;
+        font-size: 11px;
+        color: var(--text);
+        pointer-events: none;
+        z-index: 200;
+        white-space: nowrap;
+        display: none;
+        font-family: 'DM Mono', monospace;
+    }
+
+    .hm-tooltip .hm-tip-conf { color: var(--amber); }
+</style>
+
+{% if rows %}
+<div class="heatmap-body">
+    <div class="heatmap-grid">
+
+        <!-- Corner spacer -->
+        <div></div>
+
+        <!-- Hour labels -->
+        {% for h in hours %}
+        <div class="hm-hour-label">{{ h }}</div>
+        {% endfor %}
+
+        <!-- One row per species -->
+        {% for sp in species %}
+        <div class="hm-species-label" title="{{ sp }}">{{ sp }}</div>
+
+        {% for h in hours %}
+        {% set count = rows.get((sp, h), 0) %}
+        {% set level = [count, 5] | min %}
+        <div
+            class="hm-cell"
+            style="background: {{ palette[level] }}; {% if count == 0 %}opacity: 0.35;{% endif %}"
+            data-species="{{ sp }}"
+            data-hour="{{ h }}"
+            data-count="{{ count }}"
+        ></div>
+        {% endfor %}
+
+        {% endfor %}
+    </div>
+
+    <div class="hm-legend">
+        {% for swatch in palette %}
+        <div class="hm-legend-swatch" style="background: {{ swatch }}"></div>
+        {% endfor %}
+        <span class="hm-legend-spacer"></span>
+        <span>fewer → more detections</span>
+    </div>
+</div>
+{% else %}
+<div class="empty">No detection data for this period.</div>
+{% endif %}
+
+<div class="hm-tooltip" id="hm-tooltip"></div>
+
+<script>
+(function () {
+    const tooltip = document.getElementById('hm-tooltip');
+
+    document.querySelectorAll('.hm-cell').forEach(cell => {
+        cell.addEventListener('mouseenter', () => {
+            const sp    = cell.dataset.species;
+            const hour  = cell.dataset.hour;
+            const count = parseInt(cell.dataset.count, 10);
+            tooltip.innerHTML =
+                '<span style="font-style:italic">' + sp + '</span> &middot; ' + hour +
+                '<br><span class="hm-tip-conf">' +
+                (count === 0 ? 'No detections' : count + (count === 1 ? ' detection' : ' detections')) +
+                '</span>';
+            tooltip.style.display = 'block';
+        });
+
+        cell.addEventListener('mousemove', e => {
+            tooltip.style.left = (e.clientX + 14) + 'px';
+            tooltip.style.top  = (e.clientY - 36) + 'px';
+        });
+
+        cell.addEventListener('mouseleave', () => {
+            tooltip.style.display = 'none';
+        });
+    });
+})();
+</script>
