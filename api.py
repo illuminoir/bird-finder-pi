@@ -188,8 +188,8 @@ def index():
         for s in stats
     ]
 
-    # Heatmap defaults to "month" on first load
-    heatmap_rows, heatmap_species = build_heatmap(get_cutoff("month"))
+    # Heatmap defaults to "today" on first load
+    heatmap_rows, heatmap_species = build_heatmap(get_cutoff("today"))
 
     return render_template(
         "index.html",
@@ -201,10 +201,10 @@ def index():
         total_detections = total_detections,
         total_species    = total_species,
         # heatmap
-        heatmap_rows     = heatmap_rows,
-        heatmap_species  = heatmap_species,
-        heatmap_hours    = HEATMAP_HOURS,
-        heatmap_palette  = HEATMAP_PALETTE,
+        rows             = heatmap_rows,  # ← matches partial's {{ rows }}
+        species          = heatmap_species,  # ← matches partial's {{ species }}
+        hours            = HEATMAP_HOURS,
+        palette          = HEATMAP_PALETTE,
     )
 
 
@@ -246,7 +246,7 @@ def species_data():
 
 @app.route("/activity-data")
 def activity_data():
-    range_name = request.args.get("range", "month")
+    range_name = request.args.get("range", "today")
     cutoff     = get_cutoff(range_name)
 
     heatmap_rows, heatmap_species = build_heatmap(cutoff)

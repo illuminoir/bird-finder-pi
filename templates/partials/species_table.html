@@ -1,38 +1,39 @@
 {% if stats %}
 {% set max_count = stats[0].count %}
 
-<table class="species-table">
-    <thead>
-        <tr>
-            <th>Species</th>
-            <th>Detections</th>
-            <th>Last Seen</th>
-        </tr>
-    </thead>
+<div class="feed-scroll">
+    <table class="species-table">
+        <thead>
+            <tr>
+                <th>Species</th>
+                <th>Detections</th>
+                <th>Last Seen</th>
+            </tr>
+        </thead>
 
-    <tbody>
-        {% for s in stats %}
-        <tr>
-            <td class="species-name">{{ s.species }}</td>
+        <tbody>
+            {% for s in stats %}
+            <tr>
+                <td class="species-name">{{ s.species }}</td>
 
-            <td>
-                <div class="count-bar-wrap">
-                    <div class="count-bar-bg">
-                        <div class="count-bar-fill"
-                             style="width: {{ (s.count / max_count * 100)|int }}%">
+                <td>
+                    <div class="count-bar-wrap">
+                        <div class="count-bar-bg">
+                            <div class="count-bar-fill"
+                                 style="width: {{ (s.count / max_count * 100)|int }}%">
+                            </div>
                         </div>
+
+                        <span class="count-num">{{ s.count }}</span>
                     </div>
+                </td>
 
-                    <span class="count-num">{{ s.count }}</span>
-                </div>
-            </td>
-
-            <td class="last-seen">{{ s.last_seen }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-
+                <td class="last-seen">{{ s.last_seen }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 {% else %}
 <div class="empty">No species data yet.</div>
 {% endif %}
