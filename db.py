@@ -172,14 +172,14 @@ def get_activity_heatmap(cutoff=None):
 
     if cutoff:
         cursor.execute("""
-            SELECT species, timestamp_utc
+            SELECT species, timestamp_utc, confidence
             FROM detections
             WHERE timestamp_utc >= ?
             ORDER BY timestamp_utc
         """, (cutoff.isoformat(),))
     else:
         cursor.execute("""
-            SELECT species, timestamp_utc
+            SELECT species, timestamp_utc, confidence
             FROM detections
             ORDER BY timestamp_utc
         """)
@@ -190,7 +190,8 @@ def get_activity_heatmap(cutoff=None):
     return [
         {
             "species": r[0],
-            "timestamp_utc": r[1]
+            "timestamp_utc": r[1],
+            "confidence": r[2],
         }
         for r in rows
     ]

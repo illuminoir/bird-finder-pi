@@ -9,7 +9,7 @@
         grid-template-columns: 130px repeat({{ hours|length }}, 1fr);
         gap: 3px;
         align-items: center;
-        min-width: 520px;
+        min-width: 900px;
     }
 
     .hm-hour-label {
@@ -45,6 +45,63 @@
         outline: 1px solid var(--green);
     }
 
+    /* only show popup on cells that have data */
+    .hm-cell.has-data:hover .hm-popup {
+        display: block;
+    }
+
+    .hm-popup {
+        display: none;
+        position: absolute;
+        left: 50%;
+        top: calc(100% + 6px);
+        transform: translateX(-50%);
+        z-index: 100;
+        background: #0d1a0e;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 8px 12px;
+        min-width: 200px;
+        white-space: nowrap;
+        pointer-events: none;
+        font-family: 'DM Mono', monospace;
+    }
+
+    .hm-popup-title {
+        font-style: italic;
+        color: var(--text);
+        margin-bottom: 4px;
+        font-size: 12px;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 5px;
+    }
+
+    .hm-popup-hour {
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-dim);
+        margin-bottom: 6px;
+    }
+
+    .hm-popup-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 11px;
+        padding: 3px 0;
+        color: var(--text-dim);
+    }
+
+    .hm-popup-row::before {
+        content: "°";
+        color: var(--muted);
+        flex-shrink: 0;
+    }
+
+    .hm-popup-conf { color: var(--amber); min-width: 44px; }
+    .hm-popup-time { color: var(--text-dim); }
+
     .hm-legend {
         display: flex;
         align-items: center;
@@ -64,23 +121,6 @@
     }
 
     .hm-legend-spacer { margin-right: 4px; }
-
-    .hm-tooltip {
-        position: fixed;
-        background: #0d1a0e;
-        border: 1px solid var(--border);
-        border-radius: 4px;
-        padding: 6px 10px;
-        font-size: 11px;
-        color: var(--text);
-        pointer-events: none;
-        z-index: 200;
-        white-space: nowrap;
-        display: none;
-        font-family: 'DM Mono', monospace;
-    }
-
-    .hm-tooltip .hm-tip-conf { color: var(--amber); }
 </style>
 
 {% if rows %}
@@ -102,13 +142,25 @@
         {% for h in hours %}
         {% set count = rows.get((sp, h), 0) %}
         {% set level = [count, 5] | min %}
+        {% set det_list = detail.get((sp, h), []) %}
+
         <div
-            class="hm-cell"
+            class="hm-cell {% if count > 0 %}has-data{% endif %}"
             style="background: {{ palette[level] }}; {% if count == 0 %}opacity: 0.35;{% endif %}"
-            data-species="{{ sp }}"
-            data-hour="{{ h }}"
-            data-count="{{ count }}"
-        ></div>
+        >
+            {% if count > 0 %}
+            <div class="hm-popup">
+                <div class="hm-popup-title">{{ sp }}</div>
+                <div class="hm-popup-hour">{{ h }}</div>
+                {% for d in det_list %}
+                <div class="hm-popup-row">
+                    <span class="hm-popup-conf">{{ d.confidence }}%</span>
+                    <span class="hm-popup-time">{{ d.time_ago }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
         {% endfor %}
 
         {% endfor %}
@@ -125,34 +177,3 @@
 {% else %}
 <div class="empty">No detection data for this period.</div>
 {% endif %}
-
-<div class="hm-tooltip" id="hm-tooltip"></div>
-
-<script>
-(function () {
-    const tooltip = document.getElementById('hm-tooltip');
-
-    document.querySelectorAll('.hm-cell').forEach(cell => {
-        cell.addEventListener('mouseenter', () => {
-            const sp    = cell.dataset.species;
-            const hour  = cell.dataset.hour;
-            const count = parseInt(cell.dataset.count, 10);
-            tooltip.innerHTML =
-                '<span style="font-style:italic">' + sp + '</span> &middot; ' + hour +
-                '<br><span class="hm-tip-conf">' +
-                (count === 0 ? 'No detections' : count + (count === 1 ? ' detection' : ' detections')) +
-                '</span>';
-            tooltip.style.display = 'block';
-        });
-
-        cell.addEventListener('mousemove', e => {
-            tooltip.style.left = (e.clientX + 14) + 'px';
-            tooltip.style.top  = (e.clientY - 36) + 'px';
-        });
-
-        cell.addEventListener('mouseleave', () => {
-            tooltip.style.display = 'none';
-        });
-    });
-})();
-</script>

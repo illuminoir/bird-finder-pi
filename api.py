@@ -8,7 +8,7 @@ from db import (
     get_total_species,
     get_latest_detection_excluding,
     get_last_detection,
-    get_activity_heatmap   # ← new db function (see below)
+    get_activity_heatmap
 )
 from datetime import datetime, timezone, timedelta
 import requests
@@ -24,20 +24,20 @@ EXCLUDED_SPECIES = [
     # e.g. "Eurasian Magpie", "Wood Pigeon"
 ]
 
-# Hour slots displayed across the heatmap grid
 HEATMAP_HOURS = [
-    "5am", "6am", "7am", "8am", "9am", "10am",
-    "11am", "12pm", "1pm", "2pm", "3pm", "4pm",
+    "12am", "1am", "2am", "3am", "4am", "5am", "6am", "7am", "8am", "9am", "10am", "11am",
+    "12pm", "1pm", "2pm", "3pm", "4pm", "5pm", "6pm", "7pm", "8pm", "9pm", "10pm", "11pm",
 ]
 
-# Map display label → start hour (24h). Each bucket covers [start, start+1).
 HEATMAP_HOUR_MAP = {
-    "5am": 5, "6am": 6, "7am": 7, "8am": 8,
-    "9am": 9, "10am": 10, "11am": 11, "12pm": 12,
-    "1pm": 13, "2pm": 14, "3pm": 15, "4pm": 16,
+    "12am": 0,  "1am": 1,  "2am": 2,  "3am": 3,
+    "4am":  4,  "5am": 5,  "6am": 6,  "7am": 7,
+    "8am":  8,  "9am": 9,  "10am": 10, "11am": 11,
+    "12pm": 12, "1pm": 13, "2pm": 14, "3pm": 15,
+    "4pm":  16, "5pm": 17, "6pm": 18, "7pm": 19,
+    "8pm":  20, "9pm": 21, "10pm": 22, "11pm": 23,
 }
 
-# Six-stop green palette: index = clamped detection count (0–5)
 HEATMAP_PALETTE = [
     "#1a3d22",  # 0 – no detections
     "#166534",  # 1
@@ -46,6 +46,8 @@ HEATMAP_PALETTE = [
     "#22c55e",  # 4
     "#4ade80",  # 5 – most detections
 ]
+
+HEATMAP_DETAIL_LIMIT = 5
 
 # ----------------------------
 # HELPERS
@@ -91,27 +93,20 @@ def get_wikipedia_image(bird_name):
 def get_cutoff(range_name):
     now = datetime.now()
     if range_name == "today":
-        return now - timedelta(days=1)
+        return now.replace(hour=0, minute=0, second=0, microsecond=0)  # ← midnight today
     elif range_name == "week":
         return now - timedelta(days=7)
     elif range_name == "month":
         return now - timedelta(days=30)
-    return None  # "all"
+    return None
 
 
 def build_heatmap(cutoff):
-    """
-    Fetch raw detections from the db and bucket them into
-    {(species, hour_label): count}, plus an ordered species list.
-
-    get_activity_heatmap(cutoff) should return a list of dicts/rows with:
-        row["species"]       – str
-        row["timestamp_utc"] – ISO datetime string
-    """
     raw = get_activity_heatmap(cutoff)
 
-    rows = {}           # {(species, hour_label): count}
-    species_order = []  # deduplicated, insertion order
+    rows          = {}
+    detail        = {}
+    species_order = []
 
     for det in raw:
         sp   = det["species"]
@@ -122,21 +117,29 @@ def build_heatmap(cutoff):
             None
         )
         if label is None:
-            continue  # outside display window
+            continue
 
         key = (sp, label)
         rows[key] = rows.get(key, 0) + 1
 
+        if key not in detail:
+            detail[key] = []
+        if len(detail[key]) < HEATMAP_DETAIL_LIMIT:
+            detail[key].append({
+                "confidence": round(float(det["confidence"]) * 100, 1),
+                "time_ago":   time_ago(det["timestamp_utc"])
+            })
+
         if sp not in species_order:
             species_order.append(sp)
 
-    # Sort species by total detections, most active first
     species_order.sort(
         key=lambda s: sum(rows.get((s, h), 0) for h in HEATMAP_HOURS),
         reverse=True
     )
 
-    return rows, species_order
+    return rows, detail, species_order
+
 
 # ----------------------------
 # ROUTES
@@ -144,13 +147,14 @@ def build_heatmap(cutoff):
 
 @app.route("/")
 def index():
-    latest          = get_latest_detection_excluding(EXCLUDED_SPECIES)
-    recent          = get_recent_detections(20)
-    stats           = get_species_stats()
-    bird_of_day     = get_bird_of_the_day()
+    latest           = get_latest_detection_excluding(EXCLUDED_SPECIES)
+    cutoff           = get_cutoff("today")
+    recent           = get_recent_detections(cutoff)
+    stats            = get_species_stats(cutoff)
+    bird_of_day      = get_bird_of_the_day()
     total_detections = get_total_detections()
-    total_species   = get_total_species()
-    last            = get_last_detection()
+    total_species    = get_total_species()
+    last             = get_last_detection()
 
     last_formatted = None
     if last:
@@ -170,13 +174,23 @@ def index():
             "image_url":  get_wikipedia_image(latest[0])
         }
 
+    species_detections = {}
+    for r in recent:
+        sp = r["species"]
+        if sp not in species_detections:
+            species_detections[sp] = []
+        species_detections[sp].append({
+            "confidence": round(float(r["confidence"]) * 100, 1),
+            "time_ago": time_ago(r["timestamp_utc"])
+        })
+
     recent_formatted = [
         {
-            "species":    r["species"],
-            "confidence": round(float(r["confidence"]) * 100, 1),
-            "time_ago":   time_ago(r["timestamp_utc"])
+            "species": r,
+            "time_ago": species_detections[r][0]["time_ago"],
+            "all_detections": species_detections[r]
         }
-        for r in recent
+        for r in species_detections
     ]
 
     stats_formatted = [
@@ -188,8 +202,7 @@ def index():
         for s in stats
     ]
 
-    # Heatmap defaults to "today" on first load
-    heatmap_rows, heatmap_species = build_heatmap(get_cutoff("today"))
+    rows, detail, species = build_heatmap(get_cutoff("today"))
 
     return render_template(
         "index.html",
@@ -200,9 +213,9 @@ def index():
         stats            = stats_formatted,
         total_detections = total_detections,
         total_species    = total_species,
-        # heatmap
-        rows             = heatmap_rows,  # ← matches partial's {{ rows }}
-        species          = heatmap_species,  # ← matches partial's {{ species }}
+        rows             = rows,
+        detail           = detail,
+        species          = species,
         hours            = HEATMAP_HOURS,
         palette          = HEATMAP_PALETTE,
     )
@@ -214,13 +227,23 @@ def recent_data():
     cutoff     = get_cutoff(range_name)
     recent     = get_recent_detections(cutoff)
 
+    species_detections = {}
+    for r in recent:
+        sp = r["species"]
+        if sp not in species_detections:
+            species_detections[sp] = []
+        species_detections[sp].append({
+            "confidence": round(float(r["confidence"]) * 100, 1),
+            "time_ago": time_ago(r["timestamp_utc"])
+        })
+
     recent_formatted = [
         {
-            "species":    r["species"],
-            "confidence": round(float(r["confidence"]) * 100, 1),
-            "time_ago":   time_ago(r["timestamp_utc"])
+            "species": r,
+            "time_ago": species_detections[r][0]["time_ago"],
+            "all_detections": species_detections[r]
         }
-        for r in recent
+        for r in species_detections
     ]
 
     return render_template("partials/recent_table.html", recent=recent_formatted)
@@ -246,15 +269,15 @@ def species_data():
 
 @app.route("/activity-data")
 def activity_data():
-    range_name = request.args.get("range", "today")
-    cutoff     = get_cutoff(range_name)
-
-    heatmap_rows, heatmap_species = build_heatmap(cutoff)
+    range_name            = request.args.get("range", "today")
+    cutoff                = get_cutoff(range_name)
+    rows, detail, species = build_heatmap(cutoff)
 
     return render_template(
         "partials/activity_heatmap.html",
-        rows    = heatmap_rows,
-        species = heatmap_species,
+        rows    = rows,
+        detail  = detail,
+        species = species,
         hours   = HEATMAP_HOURS,
         palette = HEATMAP_PALETTE,
     )
