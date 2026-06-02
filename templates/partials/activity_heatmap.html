@@ -1,131 +1,7 @@
-<style>
-    .heatmap-body {
-        padding: 1.2rem 1.4rem 1.4rem;
-        overflow-x: auto;
-    }
-
-    .heatmap-grid {
-        display: grid;
-        grid-template-columns: 130px repeat({{ hours|length }}, 1fr);
-        gap: 3px;
-        align-items: center;
-        min-width: 900px;
-    }
-
-    .hm-hour-label {
-        font-size: 9px;
-        letter-spacing: 0.06em;
-        color: var(--text-dim);
-        text-align: center;
-        padding-bottom: 4px;
-        text-transform: uppercase;
-    }
-
-    .hm-species-label {
-        font-size: 11px;
-        color: var(--text);
-        padding-right: 10px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        font-style: italic;
-    }
-
-    .hm-cell {
-        height: 24px;
-        border-radius: 2px;
-        cursor: default;
-        transition: transform 0.1s, outline 0.1s;
-        position: relative;
-    }
-
-    .hm-cell:hover {
-        transform: scale(1.15);
-        z-index: 10;
-        outline: 1px solid var(--green);
-    }
-
-    /* only show popup on cells that have data */
-    .hm-cell.has-data:hover .hm-popup {
-        display: block;
-    }
-
-    .hm-popup {
-        display: none;
-        position: absolute;
-        left: 50%;
-        top: calc(100% + 6px);
-        transform: translateX(-50%);
-        z-index: 100;
-        background: #0d1a0e;
-        border: 1px solid var(--border);
-        border-radius: 4px;
-        padding: 8px 12px;
-        min-width: 200px;
-        white-space: nowrap;
-        pointer-events: none;
-        font-family: 'DM Mono', monospace;
-    }
-
-    .hm-popup-title {
-        font-style: italic;
-        color: var(--text);
-        margin-bottom: 4px;
-        font-size: 12px;
-        border-bottom: 1px solid var(--border);
-        padding-bottom: 5px;
-    }
-
-    .hm-popup-hour {
-        font-size: 10px;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--text-dim);
-        margin-bottom: 6px;
-    }
-
-    .hm-popup-row {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 11px;
-        padding: 3px 0;
-        color: var(--text-dim);
-    }
-
-    .hm-popup-row::before {
-        content: "°";
-        color: var(--muted);
-        flex-shrink: 0;
-    }
-
-    .hm-popup-conf { color: var(--amber); min-width: 44px; }
-    .hm-popup-time { color: var(--text-dim); }
-
-    .hm-legend {
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        margin-top: 1rem;
-        font-size: 10px;
-        color: var(--text-dim);
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-    }
-
-    .hm-legend-swatch {
-        width: 14px;
-        height: 14px;
-        border-radius: 2px;
-        flex-shrink: 0;
-    }
-
-    .hm-legend-spacer { margin-right: 4px; }
-</style>
-
 {% if rows %}
 <div class="heatmap-body">
-    <div class="heatmap-grid">
+    <div class="heatmap-grid"
+         style="grid-template-columns: 130px repeat({{ hours|length }}, 1fr);">
 
         <!-- Corner spacer -->
         <div></div>
@@ -144,23 +20,12 @@
         {% set level = [count, 5] | min %}
         {% set det_list = detail.get((sp, h), []) %}
 
-        <div
-            class="hm-cell {% if count > 0 %}has-data{% endif %}"
-            style="background: {{ palette[level] }}; {% if count == 0 %}opacity: 0.35;{% endif %}"
-        >
-            {% if count > 0 %}
-            <div class="hm-popup">
-                <div class="hm-popup-title">{{ sp }}</div>
-                <div class="hm-popup-hour">{{ h }}</div>
-                {% for d in det_list %}
-                <div class="hm-popup-row">
-                    <span class="hm-popup-conf">{{ d.confidence }}%</span>
-                    <span class="hm-popup-time">{{ d.time_ago }}</span>
-                </div>
-                {% endfor %}
-            </div>
-            {% endif %}
-        </div>
+        <div class="hm-cell {% if count > 0 %}has-data{% endif %}"
+             style="background: {{ palette[level] }}; {% if count == 0 %}opacity: 0.35;{% endif %}"
+             {% if count > 0 %}
+             data-popup="<div class='popup-title'>{{ sp }}</div><div class='popup-row' style='color:var(--text-dim);font-size:10px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px;padding:0'>{{ h }}</div>{% for d in det_list %}<div class='popup-row'><span class='popup-conf'>{{ d.confidence }}%</span><span class='popup-time'>{{ d.time_ago }}</span></div>{% endfor %}"
+             {% endif %}
+        ></div>
         {% endfor %}
 
         {% endfor %}

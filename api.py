@@ -93,7 +93,7 @@ def get_wikipedia_image(bird_name):
 def get_cutoff(range_name):
     now = datetime.now()
     if range_name == "today":
-        return now.replace(hour=0, minute=0, second=0, microsecond=0)  # ← midnight today
+        return now - timedelta(days=1)
     elif range_name == "week":
         return now - timedelta(days=7)
     elif range_name == "month":

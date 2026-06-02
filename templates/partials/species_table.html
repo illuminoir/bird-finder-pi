@@ -10,12 +10,15 @@
                 <th>Last Seen</th>
             </tr>
         </thead>
-
         <tbody>
             {% for s in stats %}
             <tr>
-                <td class="species-name">{{ s.species }}</td>
-
+                <td>
+                    <div class="feed-species-wrap"
+                         data-popup="<div class='popup-title'>{{ s.species }}</div><div class='popup-row'><span class='popup-conf'>{{ s.count }} detection{{ 's' if s.count != 1 else '' }}</span><span class='popup-time'>{{ s.last_seen }}</span></div>">
+                        <span class="species-name">{{ s.species }}</span>
+                    </div>
+                </td>
                 <td>
                     <div class="count-bar-wrap">
                         <div class="count-bar-bg">
@@ -23,11 +26,9 @@
                                  style="width: {{ (s.count / max_count * 100)|int }}%">
                             </div>
                         </div>
-
                         <span class="count-num">{{ s.count }}</span>
                     </div>
                 </td>
-
                 <td class="last-seen">{{ s.last_seen }}</td>
             </tr>
             {% endfor %}

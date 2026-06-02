@@ -1,0 +1,67 @@
+/* ── Heatmap layout ── */
+.heatmap-body {
+    padding: 1.2rem 1.4rem 1.4rem;
+    overflow-x: auto;
+}
+
+.heatmap-grid {
+    display: grid;
+    gap: 3px;
+    align-items: center;
+    min-width: 900px;
+}
+
+.hm-hour-label {
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    text-align: center;
+    padding-bottom: 4px;
+    text-transform: uppercase;
+}
+
+.hm-species-label {
+    font-size: 11px;
+    color: var(--text);
+    padding-right: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-style: italic;
+}
+
+/* ── Cells ── */
+.hm-cell {
+    height: 24px;
+    border-radius: 2px;
+    cursor: default;
+    transition: transform 0.1s, outline 0.1s;
+    position: relative;
+}
+
+.hm-cell:hover {
+    transform: scale(1.15);
+    z-index: 10;
+    outline: 1px solid var(--green);
+}
+
+/* ── Legend ── */
+.hm-legend {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 1rem;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.hm-legend-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.hm-legend-spacer { margin-right: 4px; }
