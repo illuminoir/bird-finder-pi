@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, jsonify
+import os
+from flask import Flask, render_template, request
 from db import (
     init_db,
     get_recent_detections,
@@ -8,7 +9,8 @@ from db import (
     get_total_species,
     get_latest_detection_excluding,
     get_last_detection,
-    get_activity_heatmap
+    get_activity_heatmap,
+    get_latest_rare_detection,
 )
 from datetime import datetime, timezone, timedelta
 import requests
@@ -19,10 +21,9 @@ app = Flask(__name__)
 # CONFIG
 # ----------------------------
 
-EXCLUDED_SPECIES = [
-    # Add species you want hidden from Latest Detection
-    # e.g. "Eurasian Magpie", "Wood Pigeon"
-]
+EXCLUDED_SPECIES = []
+
+EBIRD_API_KEY = os.environ.get("EBIRD_API_KEY", "")
 
 HEATMAP_HOURS = [
     "12am", "1am", "2am", "3am", "4am", "5am", "6am", "7am", "8am", "9am", "10am", "11am",
@@ -39,12 +40,12 @@ HEATMAP_HOUR_MAP = {
 }
 
 HEATMAP_PALETTE = [
-    "#1a3d22",  # 0 – no detections
-    "#166534",  # 1
-    "#15803d",  # 2
-    "#16a34a",  # 3
-    "#22c55e",  # 4
-    "#4ade80",  # 5 – most detections
+    "#1a3d22",
+    "#166534",
+    "#15803d",
+    "#16a34a",
+    "#22c55e",
+    "#4ade80",
 ]
 
 HEATMAP_DETAIL_LIMIT = 5
@@ -62,7 +63,7 @@ def time_ago(timestamp_utc_str):
         return f"{seconds}s ago"
     elif seconds < 3600:
         return f"{seconds // 60}m ago"
-    elif seconds < 86400:
+    elif seconds < 172800:
         return f"{seconds // 3600}h ago"
     else:
         return f"{seconds // 86400}d ago"
@@ -99,6 +100,27 @@ def get_cutoff(range_name):
     elif range_name == "month":
         return now - timedelta(days=30)
     return None
+
+
+def rarity_label(rank, total):
+    """Convert a rarity rank into a human-readable label."""
+    print("ALLO")
+    print(rank)
+    print(total)
+    if rank is None or total is None:
+        return None
+    pct = rank / total
+    print(pct)
+    if pct >= 0.97:
+        return "Extremely Rare"
+    elif pct >= 0.90:
+        return "Very Rare"
+    elif pct >= 0.75:
+        return "Rare"
+    elif pct >= 0.50:
+        return "Uncommon"
+    else:
+        return "Common"
 
 
 def build_heatmap(cutoff):
@@ -147,15 +169,16 @@ def build_heatmap(cutoff):
 
 @app.route("/")
 def index():
-    latest           = get_latest_detection_excluding(EXCLUDED_SPECIES)
     cutoff           = get_cutoff("today")
+    latest           = get_latest_detection_excluding(EXCLUDED_SPECIES)
     recent           = get_recent_detections(cutoff)
     stats            = get_species_stats(cutoff)
     bird_of_day      = get_bird_of_the_day()
     total_detections = get_total_detections()
     total_species    = get_total_species()
-    last             = get_last_detection()
+    rarest_today     = get_latest_rare_detection()
 
+    last = get_last_detection()
     last_formatted = None
     if last:
         last_formatted = {
@@ -174,6 +197,18 @@ def index():
             "image_url":  get_wikipedia_image(latest[0])
         }
 
+    # Rarest detection today for hero box
+    rarest_formatted = None
+    if rarest_today:
+        rarest_formatted = {
+            "species":    rarest_today[0],
+            "confidence": round(rarest_today[1] * 100, 1),
+            "time_ago":   time_ago(rarest_today[2]),
+            "rarity":     rarity_label(rarest_today[3], rarest_today[4]),
+            "image_url":  get_wikipedia_image(rarest_today[0])
+        }
+
+    # Group recent detections by species for popup
     species_detections = {}
     for r in recent:
         sp = r["species"]
@@ -181,13 +216,13 @@ def index():
             species_detections[sp] = []
         species_detections[sp].append({
             "confidence": round(float(r["confidence"]) * 100, 1),
-            "time_ago": time_ago(r["timestamp_utc"])
+            "time_ago":   time_ago(r["timestamp_utc"])
         })
 
     recent_formatted = [
         {
-            "species": r,
-            "time_ago": species_detections[r][0]["time_ago"],
+            "species":        r,
+            "time_ago":       species_detections[r][0]["time_ago"],
             "all_detections": species_detections[r]
         }
         for r in species_detections
@@ -197,17 +232,19 @@ def index():
         {
             "species":   s["species"],
             "count":     s["count"],
-            "last_seen": time_ago(s["last_seen"])
+            "last_seen": time_ago(s["last_seen"]),
+            "rarity":    rarity_label(s.get("rarity_rank"), s.get("rarity_total")),
         }
         for s in stats
     ]
 
-    rows, detail, species = build_heatmap(get_cutoff("today"))
+    rows, detail, species = build_heatmap(cutoff)
 
     return render_template(
         "index.html",
         last             = last_formatted,
         latest           = latest_formatted,
+        rarest           = rarest_formatted,
         bird_of_day      = bird_of_day,
         recent           = recent_formatted,
         stats            = stats_formatted,
@@ -234,13 +271,13 @@ def recent_data():
             species_detections[sp] = []
         species_detections[sp].append({
             "confidence": round(float(r["confidence"]) * 100, 1),
-            "time_ago": time_ago(r["timestamp_utc"])
+            "time_ago":   time_ago(r["timestamp_utc"])
         })
 
     recent_formatted = [
         {
-            "species": r,
-            "time_ago": species_detections[r][0]["time_ago"],
+            "species":        r,
+            "time_ago":       species_detections[r][0]["time_ago"],
             "all_detections": species_detections[r]
         }
         for r in species_detections
@@ -259,7 +296,8 @@ def species_data():
         {
             "species":   s["species"],
             "count":     s["count"],
-            "last_seen": time_ago(s["last_seen"])
+            "last_seen": time_ago(s["last_seen"]),
+            "rarity":    rarity_label(s.get("rarity_rank"), s.get("rarity_total")),
         }
         for s in stats
     ]
@@ -281,50 +319,6 @@ def activity_data():
         hours   = HEATMAP_HOURS,
         palette = HEATMAP_PALETTE,
     )
-
-
-@app.route("/api/data")
-def api_data():
-    latest      = get_latest_detection_excluding(EXCLUDED_SPECIES)
-    bird_of_day = get_bird_of_the_day()
-    recent      = get_recent_detections(20)
-    stats       = get_species_stats()
-
-    latest_formatted = None
-    if latest:
-        latest_formatted = {
-            "species":    latest[0],
-            "confidence": round(latest[1] * 100, 1),
-            "time_ago":   time_ago(latest[2]),
-            "image_url":  get_wikipedia_image(latest[0])
-        }
-
-    return jsonify({
-        "latest": latest_formatted,
-        "bird_of_day": {
-            "species": bird_of_day[0],
-            "count":   bird_of_day[1]
-        } if bird_of_day else None,
-        "recent": [
-            {
-                "id":         r["id"],
-                "species":    r["species"],
-                "confidence": round(float(r["confidence"]) * 100, 1),
-                "time_ago":   time_ago(r["timestamp_utc"])
-            }
-            for r in recent
-        ],
-        "stats": [
-            {
-                "species":   s["species"],
-                "count":     s["count"],
-                "last_seen": time_ago(s["last_seen"])
-            }
-            for s in stats
-        ],
-        "total_detections": get_total_detections(),
-        "total_species":    get_total_species()
-    })
 
 
 if __name__ == "__main__":

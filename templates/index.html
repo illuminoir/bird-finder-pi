@@ -52,34 +52,34 @@
             {% endif %}
         </div>
 
-        <!-- Box 2: Latest overall (all species) -->
+        <!-- Box 2: Latest rare detection -->
         <div class="latest second">
-            {% if last %}
+            {% if rarest %}
             <div class="latest-image">
-                {% if last.image_url %}
-                <img src="{{ last.image_url }}" alt="{{ last.species }}"/>
+                {% if rarest.image_url %}
+                <img src="{{ rarest.image_url }}" alt="{{ rarest.species }}"/>
                 {% else %}
                 <div class="latest-image-placeholder">🐦</div>
                 {% endif %}
             </div>
             <div class="latest-info">
-                <div class="latest-label">Last Detected (all species)</div>
-                <div class="latest-name">{{ last.species }}</div>
+                <div class="latest-label">Latest Rare Detection</div>
+                <div class="latest-name">{{ rarest.species }}</div>
                 <div class="latest-meta">
                     <div class="latest-meta-row">
                         <div class="dot"></div>
-                        <span class="latest-conf">{{ last.confidence }}% confidence</span>
+                        <span class="latest-conf">{{ rarest.rarity }}</span>
                     </div>
                     <div class="latest-meta-row">
                         <div class="dot"></div>
-                        <span>{{ last.time_ago }}</span>
+                        <span>{{ rarest.time_ago }}</span>
                     </div>
                 </div>
             </div>
             {% else %}
             <div class="latest-empty">
                 <div class="icon">🌿</div>
-                <span>No detections recorded yet.</span>
+                <span>No rare detections today.</span>
             </div>
             {% endif %}
         </div>
@@ -132,7 +132,7 @@
         <!-- Species Overview -->
         <div class="panel">
             <div class="panel-header">
-                <span>Species Overview</span>
+                <span>Species Overview (by rarity)</span>
                 <div class="filter-buttons">
                     <button class="species-filter-btn active" data-range="today">Today</button>
                     <button class="species-filter-btn" data-range="week">Week</button>
