@@ -1,14 +1,3 @@
-// ── Auto-refresh countdown ──────────────────────────────────────────────────
-setTimeout(() => { window.location.reload(); }, 30000);
-
-let countdown = 30;
-const label = document.getElementById("last-refresh");
-setInterval(() => {
-    countdown--;
-    label.textContent = `Refreshing in ${countdown}s`;
-}, 1000);
-
-
 // ── Generic fetch helper ─────────────────────────────────────────────────────
 async function fetchPartial(url, containerId) {
     const html = await fetch(url).then(r => r.text());

@@ -1,9 +1,6 @@
 import time
 import os
 import tempfile
-from datetime import datetime, timezone
-
-import numpy as np
 import sounddevice as sd
 import soundfile as sf
 
@@ -11,6 +8,9 @@ from birdnetlib import Recording
 from birdnetlib.analyzer import Analyzer
 
 from db import init_db, insert_detection
+
+from dotenv import load_dotenv
+
 
 # ----------------------------
 # CONFIG
@@ -29,6 +29,8 @@ SPECIES_COOLDOWN = 300      # seconds per species (5 mins)
 
 print("🐦 Starting Bird Listener...")
 init_db()
+
+load_dotenv()
 
 analyzer = Analyzer()
 

@@ -1,6 +1,8 @@
 import sqlite3
 import json
 from datetime import datetime, timezone, timedelta
+from data_util import get_wikipedia_image, get_wikipedia_extract, get_xeno_canto_sounds
+
 
 DB_PATH = "birds.db"
 
@@ -57,22 +59,29 @@ def insert_detection(species, confidence):
     conn.commit()
     conn.close()
 
-    if not is_species_info_cached(species):
+    if not is_species_info_cached(species) or not get_species_cache(species):
         def fetch():
             api_key = os.environ.get("EBIRD_API_KEY", "")
-            if not api_key:
-                return
-            try:
-                result = lookup_rarity(species, api_key)
-                if result:
-                    save_species_info(
-                        species,
-                        result["ebird_code"],
-                        result["rarity_rank"],
-                        result["rarity_total"],
-                    )
-            except Exception as e:
-                print(f"[eBird] error for {species}: {e}")
+
+            if not is_species_info_cached(species) and api_key:
+                try:
+                    result = lookup_rarity(species, api_key)
+                    if result:
+                        save_species_info(
+                            species,
+                            result["ebird_code"],
+                            result["rarity_rank"],
+                            result["rarity_total"],
+                        )
+                except Exception as e:
+                    print(f"[eBird] error for {species}: {e}")
+
+            if not get_species_cache(species):
+                image_url = get_wikipedia_image(species)
+                description = get_wikipedia_extract(species)
+                sounds = get_xeno_canto_sounds(species)
+                save_species_cache(species, image_url, description, sounds)
+                print(f"[Cache] pre-cached {species}")
 
         threading.Thread(target=fetch, daemon=True).start()
 
@@ -350,11 +359,16 @@ def get_species_cache(species: str) -> dict | None:
     if row:
         row = dict(row)
         row["sounds"] = json.loads(row["sounds_json"] or "[]")
+        # treat as uncached if sounds are empty
+        if not row["sounds"]:
+            return None
         return row
     return None
 
-
 def save_species_cache(species: str, image_url, description, sounds: list):
+    import traceback
+    print(f"[Cache] saving cache for {species}, sounds count: {len(sounds)}")
+    traceback.print_stack()
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("""

@@ -9,7 +9,6 @@ from db import (
     get_total_detections,
     get_total_species,
     get_latest_detection_excluding,
-    get_last_detection,
     get_activity_heatmap,
     get_latest_rare_detection,
     get_species_detail,
@@ -17,6 +16,7 @@ from db import (
     save_species_cache,
 )
 from datetime import datetime, timezone, timedelta
+from dotenv import load_dotenv
 import requests
 
 app = Flask(__name__)
@@ -27,8 +27,11 @@ app = Flask(__name__)
 
 EXCLUDED_SPECIES = []
 
+load_dotenv()
+
 EBIRD_API_KEY = os.environ.get("EBIRD_API_KEY", "")
 XC_API_KEY    = os.environ.get("XC_API_KEY", "")
+
 
 HEATMAP_HOURS = [
     "12am", "1am", "2am", "3am", "4am", "5am", "6am", "7am", "8am", "9am", "10am", "11am",
@@ -431,6 +434,26 @@ def debug_sounds():
         })
     except Exception as e:
         return jsonify({"error": str(e)})
+
+
+@app.route("/debug/clear-cache")
+def clear_cache():
+    import sqlite3
+    conn = sqlite3.connect("birds.db")
+    conn.execute("DELETE FROM species_cache")
+    conn.commit()
+    conn.close()
+    return "Cache cleared"
+
+
+@app.route("/debug/cache")
+def debug_cache():
+    import sqlite3
+    conn = sqlite3.connect("birds.db")
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("SELECT species, sounds_json, fetched_at FROM species_cache").fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
 
 
 if __name__ == "__main__":

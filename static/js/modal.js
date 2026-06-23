@@ -94,23 +94,12 @@ document.addEventListener('click', async e => {
     const species = trigger.dataset.speciesClick;
     if (!species) return;
 
-    // Reset and open
-    setEl('modal-species-name', species);
-    setEl('modal-rarity', '');
-    setEl('modal-last-seen', '');
-    setEl('modal-description', '<div class="modal-loading">Loading...</div>');
-    setEl('modal-detections', '');
-    setEl('modal-sounds', '<div class="modal-loading">Loading sounds...</div>');
-    document.getElementById('modal-img').style.display = 'none';
-    document.getElementById('modal-img-placeholder').style.display = 'flex';
-    openModal();
-
     try {
         const res  = await fetch(`/species-detail?name=${encodeURIComponent(species)}`);
         const data = await res.json();
         populateModal(data);
+        openModal();
     } catch (err) {
-        setEl('modal-description', '<div class="modal-loading">Failed to load data.</div>');
         console.error(err);
     }
 });
