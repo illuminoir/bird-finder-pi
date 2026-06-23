@@ -16,7 +16,7 @@
                 <td>
                     <div class="feed-species-wrap"
                          data-popup="<div class='popup-title'>{{ s.species }}</div><div class='popup-row'><span class='popup-conf'>{{ s.count }} detection{{ 's' if s.count != 1 else '' }}</span><span class='popup-time'>{{ s.last_seen }}</span></div>">
-                        <span class="species-name">{{ s.species }}</span>
+                        <span class="species-name" data-species-click="{{ s.species }}" style="cursor:pointer">{{ s.species }}</span>
                     </div>
                 </td>
                 <td>

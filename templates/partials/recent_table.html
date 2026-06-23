@@ -4,7 +4,7 @@
         <li class="feed-item">
             <div class="feed-species-wrap"
                  data-popup="<div class='popup-title'>{{ r.species }}</div>{% for d in r.all_detections %}<div class='popup-row'><span class='popup-conf'>{{ d.confidence }}%</span><span class='popup-time'>{{ d.time_ago }}</span></div>{% endfor %}">
-                <span class="feed-species">{{ r.species }}</span>
+                <span class="feed-species" data-species-click="{{ r.species }}" style="cursor:pointer">{{ r.species }}</span>
             </div>
             <span class="feed-meta">{{ r.time_ago }}</span>
         </li>

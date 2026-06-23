@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}"/>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tables.css') }}"/>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/heatmap.css') }}"/>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/modal.css') }}"/>
 </head>
 <body>
 <div class="wrapper">
@@ -171,6 +172,69 @@
 
 </div>
 <div id="global-popup" class="global-popup"></div>
+<div class="modal-overlay" id="modal-overlay">
+    <div class="modal" id="species-modal">
+
+        <div class="modal-header">
+            <div class="modal-image">
+                <img id="modal-img" src="" alt="" style="display:none"/>
+                <div id="modal-img-placeholder" class="modal-image-placeholder">🐦</div>
+            </div>
+            <div class="modal-title-block">
+                <button class="modal-close" id="modal-close">✕</button>
+                <div class="modal-species-name" id="modal-species-name"></div>
+                <div class="modal-rarity" id="modal-rarity"></div>
+                <div class="modal-last-seen" id="modal-last-seen"></div>
+            </div>
+        </div>
+
+        <div class="modal-body">
+
+            <!-- Stats -->
+            <div>
+                <div class="modal-section-title">Detections</div>
+                <div class="modal-stats">
+                    <div class="modal-stat">
+                        <div class="modal-stat-value" id="modal-stat-day">—</div>
+                        <div class="modal-stat-label">Last 24h</div>
+                    </div>
+                    <div class="modal-stat">
+                        <div class="modal-stat-value" id="modal-stat-week">—</div>
+                        <div class="modal-stat-label">Last 7 days</div>
+                    </div>
+                    <div class="modal-stat">
+                        <div class="modal-stat-value" id="modal-stat-month">—</div>
+                        <div class="modal-stat-label">Last 30 days</div>
+                    </div>
+                    <div class="modal-stat">
+                        <div class="modal-stat-value" id="modal-stat-total">—</div>
+                        <div class="modal-stat-label">All time</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Description -->
+            <div>
+                <div class="modal-section-title">About</div>
+                <div class="modal-description" id="modal-description"></div>
+            </div>
+
+            <!-- Recent detections with confidence -->
+            <div>
+                <div class="modal-section-title">Recent Detections</div>
+                <ul class="modal-detections" id="modal-detections"></ul>
+            </div>
+
+            <!-- Sounds -->
+            <div>
+                <div class="modal-section-title">Recordings (UK)</div>
+                <div class="modal-sounds" id="modal-sounds"></div>
+            </div>
+
+        </div>
+    </div>
+</div>
 <script src="{{ url_for('static', filename='js/index.js') }}"></script>
+<script src="{{ url_for('static', filename='js/modal.js') }}"></script>
 </body>
 </html>

@@ -1,5 +1,6 @@
 import os
-from flask import Flask, render_template, request
+import threading
+from flask import Flask, render_template, request, jsonify
 from db import (
     init_db,
     get_recent_detections,
@@ -11,6 +12,9 @@ from db import (
     get_last_detection,
     get_activity_heatmap,
     get_latest_rare_detection,
+    get_species_detail,
+    get_species_cache,
+    save_species_cache,
 )
 from datetime import datetime, timezone, timedelta
 import requests
@@ -24,6 +28,7 @@ app = Flask(__name__)
 EXCLUDED_SPECIES = []
 
 EBIRD_API_KEY = os.environ.get("EBIRD_API_KEY", "")
+XC_API_KEY    = os.environ.get("XC_API_KEY", "")
 
 HEATMAP_HOURS = [
     "12am", "1am", "2am", "3am", "4am", "5am", "6am", "7am", "8am", "9am", "10am", "11am",
@@ -69,28 +74,6 @@ def time_ago(timestamp_utc_str):
         return f"{seconds // 86400}d ago"
 
 
-def get_wikipedia_image(bird_name):
-    try:
-        headers = {"User-Agent": "BirdFinder/1.0 (bird detection hobby project)"}
-        url = "https://en.wikipedia.org/w/api.php"
-        params = {
-            "action": "query",
-            "titles": bird_name,
-            "prop": "pageimages",
-            "pithumbsize": 600,
-            "format": "json",
-            "redirects": 1
-        }
-        resp = requests.get(url, params=params, headers=headers, timeout=5)
-        data = resp.json()
-        pages = data["query"]["pages"]
-        page = next(iter(pages.values()))
-        return page.get("thumbnail", {}).get("source", None)
-    except Exception as e:
-        print(f"Wikipedia image error: {e}")
-        return None
-
-
 def get_cutoff(range_name):
     now = datetime.now()
     if range_name == "today":
@@ -103,14 +86,9 @@ def get_cutoff(range_name):
 
 
 def rarity_label(rank, total):
-    """Convert a rarity rank into a human-readable label."""
-    print("ALLO")
-    print(rank)
-    print(total)
     if rank is None or total is None:
         return None
     pct = rank / total
-    print(pct)
     if pct >= 0.97:
         return "Extremely Rare"
     elif pct >= 0.90:
@@ -123,20 +101,93 @@ def rarity_label(rank, total):
         return "Common"
 
 
-def build_heatmap(cutoff):
-    raw = get_activity_heatmap(cutoff)
+def get_wikipedia_image(bird_name):
+    try:
+        headers = {"User-Agent": "BirdFinder/1.0 (bird detection hobby project)"}
+        resp = requests.get("https://en.wikipedia.org/w/api.php", headers=headers, params={
+            "action":      "query",
+            "titles":      bird_name,
+            "prop":        "pageimages",
+            "pithumbsize": 600,
+            "format":      "json",
+            "redirects":   1
+        }, timeout=5)
+        pages = resp.json()["query"]["pages"]
+        page  = next(iter(pages.values()))
+        return page.get("thumbnail", {}).get("source", None)
+    except Exception as e:
+        print(f"Wikipedia image error: {e}")
+        return None
 
+
+def get_wikipedia_extract(bird_name):
+    try:
+        headers = {"User-Agent": "BirdFinder/1.0 (bird detection hobby project)"}
+        resp = requests.get("https://en.wikipedia.org/w/api.php", headers=headers, params={
+            "action":      "query",
+            "titles":      bird_name,
+            "prop":        "extracts",
+            "exintro":     True,
+            "explaintext": True,
+            "exsentences": 4,
+            "format":      "json",
+            "redirects":   1
+        }, timeout=5)
+        pages = resp.json()["query"]["pages"]
+        page  = next(iter(pages.values()))
+        return page.get("extract", None)
+    except Exception as e:
+        print(f"Wikipedia extract error: {e}")
+        return None
+
+
+def get_xeno_canto_sounds(bird_name, limit=3):
+    """
+    Try progressively looser queries until we get results:
+    1. Full name + UK filter
+    2. Full name only (any country)
+    3. Last word of name + UK filter (e.g. "Magpie")
+    """
+    queries = [
+        f'en:"{bird_name}" cnt:"United Kingdom"',
+        f'en:"{bird_name}"',
+        f'en:"{bird_name.split()[-1]}" cnt:"United Kingdom"',
+    ]
+    for query in queries:
+        try:
+            resp = requests.get(
+                "https://xeno-canto.org/api/3/recordings",
+                params={"query": query, "key": XC_API_KEY},
+                timeout=8
+            )
+            data = resp.json()
+            recordings = data.get("recordings", [])
+            if recordings:
+                clips = []
+                for r in recordings[:limit]:
+                    clips.append({
+                        "url":       r.get("file") or f"https://xeno-canto.org/{r['id']}/download",
+                        "recordist": r.get("rec", "Unknown"),
+                        "country":   r.get("cnt", ""),
+                        "type":      r.get("type", ""),
+                    })
+                return clips
+        except Exception as e:
+            print(f"Xeno-canto error ({query}): {e}")
+    return []
+
+
+def build_heatmap(cutoff):
+    raw           = get_activity_heatmap(cutoff)
     rows          = {}
     detail        = {}
     species_order = []
 
     for det in raw:
-        sp   = det["species"]
-        hour = datetime.fromisoformat(det["timestamp_utc"]).hour
-
+        sp    = det["species"]
+        hour  = datetime.fromisoformat(det["timestamp_utc"]).hour
         label = next(
-            (lbl for lbl, start in HEATMAP_HOUR_MAP.items() if start == hour),
-            None
+            (lbl for lbl, start in HEATMAP_HOUR_MAP.items() if start == hour), None
         )
         if label is None:
             continue
@@ -159,7 +210,6 @@ def build_heatmap(cutoff):
         key=lambda s: sum(rows.get((s, h), 0) for h in HEATMAP_HOURS),
         reverse=True
     )
-
     return rows, detail, species_order
 
 
@@ -176,17 +226,7 @@ def index():
     bird_of_day      = get_bird_of_the_day()
     total_detections = get_total_detections()
     total_species    = get_total_species()
-    rarest_today     = get_latest_rare_detection()
-
-    last = get_last_detection()
-    last_formatted = None
-    if last:
-        last_formatted = {
-            "species":    last[0],
-            "confidence": round(last[1] * 100, 1),
-            "time_ago":   time_ago(last[2]),
-            "image_url":  get_wikipedia_image(last[0])
-        }
+    rarest           = get_latest_rare_detection()
 
     latest_formatted = None
     if latest:
@@ -197,18 +237,16 @@ def index():
             "image_url":  get_wikipedia_image(latest[0])
         }
 
-    # Rarest detection today for hero box
     rarest_formatted = None
-    if rarest_today:
+    if rarest:
         rarest_formatted = {
-            "species":    rarest_today[0],
-            "confidence": round(rarest_today[1] * 100, 1),
-            "time_ago":   time_ago(rarest_today[2]),
-            "rarity":     rarity_label(rarest_today[3], rarest_today[4]),
-            "image_url":  get_wikipedia_image(rarest_today[0])
+            "species":    rarest[0],
+            "confidence": round(rarest[1] * 100, 1),
+            "time_ago":   time_ago(rarest[2]),
+            "rarity":     rarity_label(rarest[3], rarest[4]),
+            "image_url":  get_wikipedia_image(rarest[0])
         }
 
-    # Group recent detections by species for popup
     species_detections = {}
     for r in recent:
         sp = r["species"]
@@ -221,11 +259,11 @@ def index():
 
     recent_formatted = [
         {
-            "species":        r,
-            "time_ago":       species_detections[r][0]["time_ago"],
-            "all_detections": species_detections[r]
+            "species":        sp,
+            "time_ago":       species_detections[sp][0]["time_ago"],
+            "all_detections": species_detections[sp]
         }
-        for r in species_detections
+        for sp in species_detections
     ]
 
     stats_formatted = [
@@ -242,7 +280,6 @@ def index():
 
     return render_template(
         "index.html",
-        last             = last_formatted,
         latest           = latest_formatted,
         rarest           = rarest_formatted,
         bird_of_day      = bird_of_day,
@@ -276,11 +313,11 @@ def recent_data():
 
     recent_formatted = [
         {
-            "species":        r,
-            "time_ago":       species_detections[r][0]["time_ago"],
-            "all_detections": species_detections[r]
+            "species":        sp,
+            "time_ago":       species_detections[sp][0]["time_ago"],
+            "all_detections": species_detections[sp]
         }
-        for r in species_detections
+        for sp in species_detections
     ]
 
     return render_template("partials/recent_table.html", recent=recent_formatted)
@@ -319,6 +356,81 @@ def activity_data():
         hours   = HEATMAP_HOURS,
         palette = HEATMAP_PALETTE,
     )
+
+
+@app.route("/species-detail")
+def species_detail():
+    species = request.args.get("name", "")
+    if not species:
+        return jsonify({"error": "no species provided"}), 400
+
+    db_data = get_species_detail(species)
+    info    = db_data.get("info", {})
+
+    # Check cache first
+    cached = get_species_cache(species)
+    if cached:
+        image_url   = cached["image_url"]
+        description = cached["description"]
+        sounds      = cached["sounds"]
+    else:
+        # Fetch all three in parallel threads
+        results = {}
+
+        def fetch_image():
+            results["image_url"] = get_wikipedia_image(species)
+
+        def fetch_desc():
+            results["description"] = get_wikipedia_extract(species)
+
+        def fetch_sounds():
+            results["sounds"] = get_xeno_canto_sounds(species)
+
+        threads = [
+            threading.Thread(target=fetch_image),
+            threading.Thread(target=fetch_desc),
+            threading.Thread(target=fetch_sounds),
+        ]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        image_url   = results.get("image_url")
+        description = results.get("description")
+        sounds      = results.get("sounds", [])
+
+        # Save to cache
+        save_species_cache(species, image_url, description, sounds)
+
+    return jsonify({
+        "species":     species,
+        "image_url":   image_url,
+        "description": description,
+        "rarity":      rarity_label(info.get("rarity_rank"), info.get("rarity_total")),
+        "stats":       db_data["stats"],
+        "recent":      db_data["recent"],
+        "sounds":      sounds,
+    })
+
+
+@app.route("/debug/sounds")
+def debug_sounds():
+    species = request.args.get("name", "Eurasian Magpie")
+    query   = f'en:"{species}" cnt:"United Kingdom"'
+    try:
+        resp = requests.get(
+            "https://xeno-canto.org/api/3/recordings",
+            params={"query": query, "key": XC_API_KEY},
+            timeout=8
+        )
+        return jsonify({
+            "status_code": resp.status_code,
+            "query_used":  query,
+            "raw":         resp.json()
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)})
 
 
 if __name__ == "__main__":
