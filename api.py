@@ -1,6 +1,10 @@
 import os
 import threading
 from flask import Flask, render_template, request, jsonify
+
+from dotenv import load_dotenv
+load_dotenv()
+
 from db import (
     init_db,
     get_recent_detections,
@@ -15,8 +19,8 @@ from db import (
     get_species_cache,
     save_species_cache,
 )
+from data_util import get_wikipedia_image, get_wikipedia_extract, get_xeno_canto_sounds
 from datetime import datetime, timezone, timedelta
-from dotenv import load_dotenv
 import requests
 
 app = Flask(__name__)
@@ -26,12 +30,6 @@ app = Flask(__name__)
 # ----------------------------
 
 EXCLUDED_SPECIES = []
-
-load_dotenv()
-
-EBIRD_API_KEY = os.environ.get("EBIRD_API_KEY", "")
-XC_API_KEY    = os.environ.get("XC_API_KEY", "")
-
 
 HEATMAP_HOURS = [
     "12am", "1am", "2am", "3am", "4am", "5am", "6am", "7am", "8am", "9am", "10am", "11am",
@@ -102,82 +100,6 @@ def rarity_label(rank, total):
         return "Uncommon"
     else:
         return "Common"
-
-
-def get_wikipedia_image(bird_name):
-    try:
-        headers = {"User-Agent": "BirdFinder/1.0 (bird detection hobby project)"}
-        resp = requests.get("https://en.wikipedia.org/w/api.php", headers=headers, params={
-            "action":      "query",
-            "titles":      bird_name,
-            "prop":        "pageimages",
-            "pithumbsize": 600,
-            "format":      "json",
-            "redirects":   1
-        }, timeout=5)
-        pages = resp.json()["query"]["pages"]
-        page  = next(iter(pages.values()))
-        return page.get("thumbnail", {}).get("source", None)
-    except Exception as e:
-        print(f"Wikipedia image error: {e}")
-        return None
-
-
-def get_wikipedia_extract(bird_name):
-    try:
-        headers = {"User-Agent": "BirdFinder/1.0 (bird detection hobby project)"}
-        resp = requests.get("https://en.wikipedia.org/w/api.php", headers=headers, params={
-            "action":      "query",
-            "titles":      bird_name,
-            "prop":        "extracts",
-            "exintro":     True,
-            "explaintext": True,
-            "exsentences": 4,
-            "format":      "json",
-            "redirects":   1
-        }, timeout=5)
-        pages = resp.json()["query"]["pages"]
-        page  = next(iter(pages.values()))
-        return page.get("extract", None)
-    except Exception as e:
-        print(f"Wikipedia extract error: {e}")
-        return None
-
-
-def get_xeno_canto_sounds(bird_name, limit=3):
-    """
-    Try progressively looser queries until we get results:
-    1. Full name + UK filter
-    2. Full name only (any country)
-    3. Last word of name + UK filter (e.g. "Magpie")
-    """
-    queries = [
-        f'en:"{bird_name}" cnt:"United Kingdom"',
-        f'en:"{bird_name}"',
-        f'en:"{bird_name.split()[-1]}" cnt:"United Kingdom"',
-    ]
-    for query in queries:
-        try:
-            resp = requests.get(
-                "https://xeno-canto.org/api/3/recordings",
-                params={"query": query, "key": XC_API_KEY},
-                timeout=8
-            )
-            data = resp.json()
-            recordings = data.get("recordings", [])
-            if recordings:
-                clips = []
-                for r in recordings[:limit]:
-                    clips.append({
-                        "url":       r.get("file") or f"https://xeno-canto.org/{r['id']}/download",
-                        "recordist": r.get("rec", "Unknown"),
-                        "country":   r.get("cnt", ""),
-                        "type":      r.get("type", ""),
-                    })
-                return clips
-        except Exception as e:
-            print(f"Xeno-canto error ({query}): {e}")
-    return []
 
 
 def build_heatmap(cutoff):
@@ -370,14 +292,12 @@ def species_detail():
     db_data = get_species_detail(species)
     info    = db_data.get("info", {})
 
-    # Check cache first
     cached = get_species_cache(species)
     if cached:
         image_url   = cached["image_url"]
         description = cached["description"]
         sounds      = cached["sounds"]
     else:
-        # Fetch all three in parallel threads
         results = {}
 
         def fetch_image():
@@ -403,7 +323,6 @@ def species_detail():
         description = results.get("description")
         sounds      = results.get("sounds", [])
 
-        # Save to cache
         save_species_cache(species, image_url, description, sounds)
 
     return jsonify({
@@ -417,6 +336,13 @@ def species_detail():
     })
 
 
+@app.route("/species-cache-check")
+def species_cache_check():
+    species = request.args.get("name", "")
+    cached = get_species_cache(species)
+    return jsonify({"cached": cached is not None})
+
+
 @app.route("/debug/sounds")
 def debug_sounds():
     species = request.args.get("name", "Eurasian Magpie")
@@ -424,7 +350,7 @@ def debug_sounds():
     try:
         resp = requests.get(
             "https://xeno-canto.org/api/3/recordings",
-            params={"query": query, "key": XC_API_KEY},
+            params={"query": query, "key": os.environ.get("XC_API_KEY", "")},
             timeout=8
         )
         return jsonify({
