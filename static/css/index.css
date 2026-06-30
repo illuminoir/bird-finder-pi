@@ -8,6 +8,7 @@
     --muted:     #4a5e4c;
     --text:      #d4e8d5;
     --text-dim:  #6b8a6d;
+    --purple:    #c084fc;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -160,6 +161,8 @@ header {
 }
 
 .latest-empty .icon { font-size: 2.5rem; opacity: 0.4; }
+
+.latest-rarity { color: var(--purple); }
 
 /* ── Stats row ── */
 .stats-row {
