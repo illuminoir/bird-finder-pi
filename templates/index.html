@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tables.css') }}"/>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/heatmap.css') }}"/>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/modal.css') }}"/>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/lifelist.css') }}"/>
 </head>
 <body>
 <div class="wrapper">
@@ -16,6 +17,10 @@
     <!-- Header -->
     <header>
         <div class="logo">Bird<span>.</span>Finder</div>
+        <nav class="main-nav">
+            <a href="{{ url_for('index') }}" class="nav-link active">Dashboard</a>
+            <a href="{{ url_for('life_list') }}" class="nav-link">Life List</a>
+        </nav>
     </header>
 
     <!-- Latest detections -->

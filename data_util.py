@@ -83,3 +83,31 @@ def get_xeno_canto_sounds(bird_name, limit=3):
 
     print(f"[XC] no recordings found for '{bird_name}' after all queries")
     return []
+
+
+def remove_background(image_url: str):
+    try:
+        from rembg import remove
+    except ImportError:
+        print("[rembg] not installed — skipping background removal")
+        return None
+
+    try:
+        from PIL import Image
+        import io, base64
+
+        headers = {"User-Agent": "BirdFinder/1.0 (bird detection hobby project)"}
+        resp = requests.get(image_url, headers=headers, timeout=10)
+        resp.raise_for_status()
+
+        input_image  = Image.open(io.BytesIO(resp.content)).convert("RGBA")
+        output_image = remove(input_image)
+
+        buffer = io.BytesIO()
+        output_image.save(buffer, format="PNG")
+        b64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+        return f"data:image/png;base64,{b64}"
+
+    except Exception as e:
+        print(f"[rembg] error for {image_url}: {e}")
+        return None

@@ -18,12 +18,28 @@ from db import (
     get_species_detail,
     get_species_cache,
     save_species_cache,
+    get_life_list, save_removed_bg,
 )
-from data_util import get_wikipedia_image, get_wikipedia_extract, get_xeno_canto_sounds
+from data_util import get_wikipedia_image, get_wikipedia_extract, get_xeno_canto_sounds, remove_background
 from datetime import datetime, timezone, timedelta
 import requests
 
 app = Flask(__name__)
+
+import queue
+
+_rembg_queue          = queue.Queue()
+_rembg_worker_started = False
+
+def _rembg_worker():
+    while True:
+        species, url = _rembg_queue.get()
+        print(f"[rembg] processing {species}...")
+        result_url = remove_background(url)
+        if result_url:
+            save_removed_bg(species, result_url)
+            print(f"[rembg] done {species}")
+        _rembg_queue.task_done()
 
 # ----------------------------
 # CONFIG
@@ -381,6 +397,37 @@ def debug_cache():
     conn.close()
     return jsonify([dict(r) for r in rows])
 
+
+@app.route("/life-list")
+def life_list():
+    return render_template("lifelist.html")
+
+
+@app.route("/life-list-data")
+def life_list_data():
+    global _rembg_worker_started
+    if not _rembg_worker_started:
+        threading.Thread(target=_rembg_worker, daemon=True).start()
+        _rembg_worker_started = True
+
+    range_name   = request.args.get("range", "all")
+    cutoff       = get_cutoff(range_name)
+    species_list = get_life_list(min_confidence=0.5, cutoff=cutoff)
+
+    result = []
+    for s in species_list:
+        result.append({
+            "species":        s["species"],
+            "count":          s["count"],
+            "rarity":         rarity_label(s.get("rarity_rank"), s.get("rarity_total")),
+            "image_url":      s["image_url"],
+            "removed_bg_url": s["removed_bg_url"],
+        })
+
+        if s["image_url"] and not s["removed_bg_url"]:
+            _rembg_queue.put((s["species"], s["image_url"]))
+
+    return jsonify(result)
 
 if __name__ == "__main__":
     init_db()

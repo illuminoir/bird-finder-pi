@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Bird Finder — Life List</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}"/>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tables.css') }}"/>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/modal.css') }}"/>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/lifelist.css') }}"/>
+</head>
+<body>
+<div class="wrapper">
+
+    <!-- Header -->
+    <header>
+        <div class="logo">Bird<span>.</span>Finder</div>
+        <nav class="main-nav">
+            <a href="{{ url_for('index') }}" class="nav-link">Dashboard</a>
+            <a href="{{ url_for('life_list') }}" class="nav-link active">Life List</a>
+        </nav>
+    </header>
+
+    <!-- Stats row -->
+    <div class="stats-row" style="animation: fadeUp 0.6s 0.1s ease both;">
+        <div class="stat-card">
+            <div class="stat-label">Species Detected</div>
+            <div class="stat-value" id="ll-total-species">—</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Total Detections</div>
+            <div class="stat-value" id="ll-total-detections">—</div>
+        </div>
+    </div>
+
+    <!-- Collage panel -->
+    <div class="panel" style="animation: fadeUp 0.6s 0.2s ease both;">
+        <div class="panel-header">
+            <span>Life List</span>
+            <div class="filter-buttons">
+                <button class="activity-filter-btn" data-range="today">Today</button>
+                <button class="activity-filter-btn" data-range="week">Week</button>
+                <button class="activity-filter-btn" data-range="month">Month</button>
+                <button class="activity-filter-btn active" data-range="all">All</button>
+            </div>
+        </div>
+        <div class="lifelist-collage" id="collage-container">
+            <div class="lifelist-loading">Loading life list...</div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <span>Bird Finder — Raspberry Pi</span>
+    </footer>
+
+</div>
+
+<!-- Species modal -->
+<div class="modal-overlay" id="modal-overlay">
+    <div class="modal" id="species-modal">
+        <div class="modal-header">
+            <div class="modal-image">
+                <img id="modal-img" src="" alt="" style="display:none"/>
+                <div id="modal-img-placeholder" class="modal-image-placeholder">🐦</div>
+            </div>
+            <div class="modal-title-block">
+                <button class="modal-close" id="modal-close">✕</button>
+                <div class="modal-species-name" id="modal-species-name"></div>
+                <div class="modal-rarity" id="modal-rarity"></div>
+                <div class="modal-last-seen" id="modal-last-seen"></div>
+            </div>
+        </div>
+        <div class="modal-body">
+            <div>
+                <div class="modal-section-title">Detections</div>
+                <div class="modal-stats">
+                    <div class="modal-stat">
+                        <div class="modal-stat-value" id="modal-stat-day">—</div>
+                        <div class="modal-stat-label">Last 24h</div>
+                    </div>
+                    <div class="modal-stat">
+                        <div class="modal-stat-value" id="modal-stat-week">—</div>
+                        <div class="modal-stat-label">Last 7 days</div>
+                    </div>
+                    <div class="modal-stat">
+                        <div class="modal-stat-value" id="modal-stat-month">—</div>
+                        <div class="modal-stat-label">Last 30 days</div>
+                    </div>
+                    <div class="modal-stat">
+                        <div class="modal-stat-value" id="modal-stat-total">—</div>
+                        <div class="modal-stat-label">All time</div>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <div class="modal-section-title">About</div>
+                <div class="modal-description" id="modal-description"></div>
+            </div>
+            <div>
+                <div class="modal-section-title">Recent Detections</div>
+                <ul class="modal-detections" id="modal-detections"></ul>
+            </div>
+            <div>
+                <div class="modal-section-title">Recordings (UK)</div>
+                <div class="modal-sounds" id="modal-sounds"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="global-popup" class="global-popup"></div>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="{{ url_for('static', filename='js/modal.js') }}"></script>
+<script src="{{ url_for('static', filename='js/lifelist.js') }}"></script>
+</body>
+</html>

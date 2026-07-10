@@ -36,9 +36,15 @@ def init_db():
             image_url    TEXT,
             description  TEXT,
             sounds_json  TEXT,
-            fetched_at   TEXT
+            fetched_at   TEXT,
+            removed_bg_url TEXT
         )
     """)
+
+    try:
+        cursor.execute("ALTER TABLE species_cache ADD COLUMN removed_bg_url TEXT")
+    except sqlite3.OperationalError:
+        pass  # column already exists
 
     conn.commit()
     conn.close()
@@ -386,5 +392,63 @@ def save_species_cache(species: str, image_url, description, sounds: list):
         json.dumps(sounds),
         datetime.now(timezone.utc).isoformat()
     ))
+    conn.commit()
+    conn.close()
+
+
+def get_life_list(min_confidence: float = 0.5, cutoff=None) -> list:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    if cutoff:
+        cursor.execute("""
+            SELECT
+                d.species,
+                COUNT(*) as count,
+                MAX(d.confidence) as max_confidence,
+                si.rarity_rank,
+                si.rarity_total,
+                sc.image_url,
+                sc.removed_bg_url
+            FROM detections d
+            LEFT JOIN species_info si ON si.species = d.species
+            LEFT JOIN species_cache sc ON sc.species = d.species
+            WHERE d.confidence >= ?
+              AND d.timestamp_utc >= ?
+            GROUP BY d.species
+            ORDER BY count DESC
+        """, (min_confidence, cutoff.isoformat()))
+    else:
+        cursor.execute("""
+            SELECT
+                d.species,
+                COUNT(*) as count,
+                MAX(d.confidence) as max_confidence,
+                si.rarity_rank,
+                si.rarity_total,
+                sc.image_url,
+                sc.removed_bg_url
+            FROM detections d
+            LEFT JOIN species_info si ON si.species = d.species
+            LEFT JOIN species_cache sc ON sc.species = d.species
+            WHERE d.confidence >= ?
+            GROUP BY d.species
+            ORDER BY count DESC
+        """, (min_confidence,))
+
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def save_removed_bg(species: str, removed_bg_url: str):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE species_cache
+        SET removed_bg_url = ?
+        WHERE species = ?
+    """, (removed_bg_url, species))
     conn.commit()
     conn.close()

@@ -1,0 +1,64 @@
+/* ── Nav ── */
+.main-nav {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.nav-link {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    text-decoration: none;
+    padding: 0.3rem 0.6rem;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    transition: all 0.15s ease;
+}
+
+.nav-link:hover {
+    color: var(--green);
+    border-color: var(--border);
+}
+
+.nav-link.active {
+    color: var(--green);
+    border-color: var(--green);
+    background: var(--green-dim);
+}
+
+/* ── Collage container ── */
+.lifelist-collage {
+    width: 100%;
+    min-height: 600px;
+    position: relative;
+    background: var(--surface);
+}
+
+.lifelist-loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+}
+
+/* ── SVG ── */
+.collage-svg {
+    display: block;
+}
+
+/* ── Bubble nodes ── */
+.bird-node { cursor: pointer; }
+
+.bird-node image {
+    transition: filter 0.2s ease;
+}
+
+.bird-node:hover image {
+    filter: brightness(1.15) drop-shadow(0 0 8px rgba(74, 222, 128, 0.4));
+}
